@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Scissors, LayoutGrid, Users, Calendar, CreditCard, Store,
-  LogOut, Loader2, Search, AlertCircle, TrendingUp, Mail, Clock
+  LogOut, Loader2, Search, AlertCircle, TrendingUp, Mail, Clock, BarChart2
 } from "lucide-react";
 import { API_URL } from "../lib/api";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 
 const INK = "#1A1614";
 const CREAM = "#F5F0EA";
@@ -25,6 +26,7 @@ export default function AdminDashboard({ initialToken, onLogout }) {
         {view === "salons" && <SalonsView token={token} />}
         {view === "users" && <UsersView token={token} />}
         {view === "paiements" && <PaiementsView token={token} />}
+        {view === "analytics" && <AnalyticsView token={token} />}
       </main>
     </div>
   );
@@ -36,7 +38,8 @@ function Sidebar({ view, setView, onLogout }) {
     { id: "rendezvous", label: "Rendez-vous", icon: Calendar },
     { id: "salons", label: "Salons", icon: Store },
     { id: "users", label: "Utilisateurs", icon: Users },
-    { id: "paiements", label: "Paiements", icon: CreditCard }
+    { id: "paiements", label: "Paiements", icon: CreditCard },
+    { id: "analytics", label: "Analytics", icon: BarChart2 }
   ];
 
   return (
@@ -385,6 +388,178 @@ function PaiementsView({ token }) {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function AnalyticsView({ token }) {
+  const { data: rdvs, loading: l1 } = useFetch(token, "/rendezvous", [token]);
+  const { data: paiements, loading: l2 } = useFetch(token, "/paiements", [token]);
+  const { data: users, loading: l3 } = useFetch(token, "/users", [token]);
+  const loading = l1 || l2 || l3;
+
+  if (loading) return <div className="px-10 py-10"><LoadingBlock /></div>;
+
+  // Revenus par mois
+  const revenusParMois = () => {
+    if (!paiements) return [];
+    const mois = {};
+    paiements.forEach(p => {
+      const date = new Date(p.createdAt);
+      const key = date.toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
+      mois[key] = (mois[key] || 0) + p.montant;
+    });
+    return Object.entries(mois).map(([mois, revenus]) => ({ mois, revenus })).slice(-6);
+  };
+
+  // RDV par statut
+  const rdvParStatut = () => {
+    if (!rdvs) return [];
+    const statuts = {};
+    rdvs.forEach(r => {
+      statuts[r.statut] = (statuts[r.statut] || 0) + 1;
+    });
+    const labels = {
+      en_attente: "En attente",
+      confirme: "Confirmé",
+      annule: "Annulé",
+      termine: "Terminé"
+    };
+    const colors = {
+      en_attente: "#FBF1DD",
+      confirme: "#E2EFE3",
+      annule: "#FBE9E7",
+      termine: "#E8E5E1"
+    };
+    return Object.entries(statuts).map(([statut, count]) => ({
+      name: labels[statut] || statut,
+      value: count,
+      color: colors[statut] || "#E8E5E1"
+    }));
+  };
+
+  // Top prestations
+  const topPrestations = () => {
+    if (!rdvs) return [];
+    const prestations = {};
+    rdvs.forEach(r => {
+      const nom = r.prestation?.nom || "Inconnu";
+      prestations[nom] = (prestations[nom] || 0) + 1;
+    });
+    return Object.entries(prestations)
+      .map(([nom, count]) => ({ nom, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  };
+
+  const totalRevenus = paiements?.reduce((sum, p) => sum + p.montant, 0) || 0;
+  const tauxConfirmation = rdvs?.length
+    ? Math.round((rdvs.filter(r => r.statut === "confirme" || r.statut === "termine").length / rdvs.length) * 100)
+    : 0;
+
+  return (
+    <div className="px-10 py-10 max-w-6xl">
+      <PageHeader eyebrow="Statistiques" title="Analytics" subtitle="Vue détaillée des performances de votre salon." />
+
+      {/* KPIs */}
+      <div className="grid grid-cols-4 gap-4 mb-10">
+        <KpiCard label="Revenus totaux" value={`${totalRevenus} €`} icon={TrendingUp} />
+        <KpiCard label="Rendez-vous" value={rdvs?.length || 0} icon={Calendar} accent />
+        <KpiCard label="Clients" value={users?.length || 0} icon={Users} />
+        <KpiCard label="Taux confirmation" value={`${tauxConfirmation}%`} icon={BarChart2} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-6 mb-6">
+        {/* Revenus par mois */}
+        <div className="rounded-2xl p-6" style={{ backgroundColor: "white" }}>
+          <h3 className="text-sm font-semibold mb-6" style={{ color: INK, fontFamily: "'Inter', sans-serif" }}>
+            Revenus par mois
+          </h3>
+          {revenusParMois().length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={revenusParMois()}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F0EBE3" />
+                <XAxis dataKey="mois" tick={{ fontSize: 11, fill: FAINT }} />
+                <YAxis tick={{ fontSize: 11, fill: FAINT }} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: INK, border: "none", borderRadius: 8, color: CREAM, fontSize: 12 }}
+                  formatter={(value) => [`${value} €`, "Revenus"]}
+                />
+                <Bar dataKey="revenus" fill={GOLD} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-sm text-center py-10" style={{ color: FAINT, fontFamily: "'Inter', sans-serif" }}>
+              Aucune donnée disponible
+            </p>
+          )}
+        </div>
+
+        {/* RDV par statut */}
+        <div className="rounded-2xl p-6" style={{ backgroundColor: "white" }}>
+          <h3 className="text-sm font-semibold mb-6" style={{ color: INK, fontFamily: "'Inter', sans-serif" }}>
+            Rendez-vous par statut
+          </h3>
+          {rdvParStatut().length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie data={rdvParStatut()} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, value }) => `${name}: ${value}`} labelLine={false} fontSize={11}>
+                  {rdvParStatut().map((entry, index) => (
+                    <Cell key={index} fill={entry.color} stroke={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ backgroundColor: INK, border: "none", borderRadius: 8, color: CREAM, fontSize: 12 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-sm text-center py-10" style={{ color: FAINT, fontFamily: "'Inter', sans-serif" }}>
+              Aucune donnée disponible
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Top prestations */}
+      <div className="rounded-2xl p-6" style={{ backgroundColor: "white" }}>
+        <h3 className="text-sm font-semibold mb-6" style={{ color: INK, fontFamily: "'Inter', sans-serif" }}>
+          Top prestations
+        </h3>
+        {topPrestations().length > 0 ? (
+          <div className="space-y-3">
+            {topPrestations().map((p, i) => (
+              <div key={p.nom} className="flex items-center gap-4">
+                <span className="text-sm w-4 shrink-0" style={{ color: FAINT, fontFamily: "'Inter', sans-serif" }}>{i + 1}</span>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium" style={{ color: INK, fontFamily: "'Inter', sans-serif" }}>{p.nom}</span>
+                    <span className="text-sm" style={{ color: MUTED, fontFamily: "'Inter', sans-serif" }}>{p.count} RDV</span>
+                  </div>
+                  <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: "#F0EBE3" }}>
+                    <div className="h-full rounded-full" style={{
+                      backgroundColor: GOLD,
+                      width: `${(p.count / topPrestations()[0].count) * 100}%`
+                    }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-center py-6" style={{ color: FAINT, fontFamily: "'Inter', sans-serif" }}>
+            Aucune donnée disponible
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function KpiCard({ label, value, icon: Icon, accent }) {
+  return (
+    <div className="rounded-2xl p-5" style={{ backgroundColor: accent ? INK : "white" }}>
+      <Icon className="h-5 w-5 mb-4" style={{ color: accent ? GOLD : MUTED }} />
+      <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.75rem", color: accent ? CREAM : INK }}>{value}</p>
+      <p className="text-xs mt-1" style={{ color: accent ? ROSE : FAINT, fontFamily: "'Inter', sans-serif" }}>{label}</p>
     </div>
   );
 }
