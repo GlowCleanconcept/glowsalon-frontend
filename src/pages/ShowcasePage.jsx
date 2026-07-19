@@ -41,10 +41,16 @@ export default function ShowcasePage() {
           </div>
           <span style={{ fontFamily: "'Playfair Display', serif", color: INK, fontSize: "1.2rem" }}>Glow Salon</span>
         </div>
-        <Link to="/connexion" className="text-sm px-5 py-2.5 rounded-full font-medium"
-          style={{ backgroundColor: INK, color: CREAM, fontFamily: "'Inter', sans-serif" }}>
-          Réserver
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link to="/creer-salon" className="text-sm px-5 py-2.5 rounded-full font-medium"
+            style={{ backgroundColor: "rgba(26,22,20,0.06)", color: INK, fontFamily: "'Inter', sans-serif" }}>
+            Ouvrir mon salon
+          </Link>
+          <Link to="/connexion" className="text-sm px-5 py-2.5 rounded-full font-medium"
+            style={{ backgroundColor: INK, color: CREAM, fontFamily: "'Inter', sans-serif" }}>
+            Réserver
+          </Link>
+        </div>
       </nav>
 
       <section className="relative overflow-hidden" style={{ backgroundColor: INK }}>

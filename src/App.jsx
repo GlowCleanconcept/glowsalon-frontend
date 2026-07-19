@@ -5,6 +5,7 @@ import ShowcasePage from "./pages/ShowcasePage";
 import AuthPage from "./pages/AuthPage";
 import BookingPage from "./pages/BookingPage";
 import AdminDashboard from "./pages/AdminDashboard";
+import RegisterSalonPage from "./pages/RegisterSalonPage";
 import { decodeToken, clearSession, saveSession, restoreSession } from "./lib/api";
 
 const INK = "#1A1614";
@@ -45,6 +46,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<ShowcasePage />} />
+
         <Route
           path="/connexion"
           element={
@@ -55,6 +57,18 @@ export default function App() {
             )
           }
         />
+
+        <Route
+          path="/creer-salon"
+          element={
+            session ? (
+              <Navigate to="/admin" replace />
+            ) : (
+              <RegisterSalonPage onAuthenticated={handleAuthenticated} />
+            )
+          }
+        />
+
         <Route
           path="/reserver"
           element={
@@ -65,6 +79,7 @@ export default function App() {
             )
           }
         />
+
         <Route
           path="/admin"
           element={
@@ -75,6 +90,7 @@ export default function App() {
             )
           }
         />
+
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
